@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html>
+<head>
+            <style>body {
+    font-family: Arial, sans-serif;
+    text-align: center;
+    margin: 0;
+    background-color: gray;
+}
+#logo {
+    font-size: 36px;
+    font-weight: bold;
+    color: #333;
+    position: absolute;
+    top: 10px;
+    left: 10px;
+}
+#timer, #score, #bestScore, #countdownDisplay {
+    font-size: 24px;
+    position: absolute;
+}
+#timer { top: 50px; left: 10px; }
+#score { top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 48px; }
+#bestScore { top: 10px; right: 10px; }
+#countdownDisplay {
+    font-size: 72px;
+    color: aqua;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    display: none;
+}
+#modeSelection, .target, #gameOverContainer {
+    position: absolute;
+}
+#modeSelection {
+    top: 40%; left: 50%; transform: translate(-50%, -50%);
+    display: flex; align-items: center; justify-content: center;
+    gap: 20px;
+    flex-direction: column;
+}
+.modeButtons {
+    display: flex;
+    gap: 50px;
+    width: 100%;
+    justify-content: center;
+}
+.modeButton {
+    padding: 20px 40px;
+    font-size: 24px;
+    cursor: pointer;
+    width: 150px;
+    border: none;
+}
+#startGameButton, #retryButton {
+    padding: 20px 40px;
+    font-size: 24px;
+    cursor: pointer;
+    margin-top: 20px;
+}
+.selected { background-color: #555; color: white; }
+.target {
+    border-radius: 50%; /* ターゲットを丸くする */
+}
+#gameOverContainer {
+    top: 50%; left: 50%; transform: translate(-50%, -50%);
+    text-align: center;
+}
+#gameOver {
+    font-size: 36px;
+    font-weight: bold;
+    color: red;
+    margin-bottom: 20px;
+}
+
+</style>
+        </head>
+        <body>
+            
+
+
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Click Labo</title>
+    <link rel="stylesheet" href="styles.css">
+
+
+    <div id="logo">Click Labo</div>
+    <div id="timer">残り時間: 30.0秒</div>
+    <div id="score">得点: 0</div>
+    <div id="bestScore">ベストスコア：</div>
+    
+    <!-- カウントダウン表示 -->
+    <div id="countdownDisplay"></div>
+
+    <!-- モード選択ボタン -->
+    <div id="modeSelection">
+        <div class="modeButtons">
+            <button id="movingMode" class="modeButton">Moving</button>
+            <button id="noMoveMode" class="modeButton">No Move</button>
+        </div>
+        <button id="startGameButton">ゲームをスタート</button>
+    </div>
+
+    <!-- ゲーム終了表示とリトライボタン -->
+<div id="gameOverContainer" style="display: none; text-align: center; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);">
+    <div id="gameOver" style="font-size: 48px; font-weight: bold; color: red; margin-bottom: 20px;">ゲーム終了</div>
+    <button id="retryButton" style="font-size: 24px; padding: 10px 20px; cursor: pointer; display: none;" onclick="pushretryButton()">もう一回チャレンジ</button>
+
+
+    <script src="script.js"></script>
+
+
+
+            <script>let score = 0, timeLeft = 30.0, timerInterval, bestScore = 0, countdownInterval;
+let movingMode = false, selectedMode = null, moveInterval = null;
+
+const scoreDisplay = document.getElementById('score');
+const timerDisplay = document.getElementById('timer');
+const countdownDisplay = document.getElementById('countdownDisplay');
+const movingModeButton = document.getElementById('movingMode');
+const noMoveModeButton = document.getElementById('noMoveMode');
+const startGameButton = document.getElementById('startGameButton');
+const retryButton = document.getElementById('retryButton');
+const modeSelection = document.getElementById('modeSelection');
+const gameOverContainer = document.getElementById('gameOverContainer');
+const bestScoreDisplay = document.getElementById('bestScore');
+retryButton.setAttribute('onclick', 'pushretryButton()')
+
+// モード選択ボタンのイベントリスナー
+movingModeButton.onclick = () => selectMode("moving");
+noMoveModeButton.onclick = () => selectMode("noMove");
+
+// モード選択処理
+function selectMode(mode) {
+    movingMode = (mode === "moving");
+    movingModeButton.classList.toggle("selected", movingMode);
+    noMoveModeButton.classList.toggle("selected", !movingMode);
+    selectedMode = mode;
+}
+
+// ゲーム開始ボタン
+startGameButton.onclick = () => {
+    if (!selectedMode) return alert("どちらかのモードを選択してください");
+    modeSelection.style.display = "none";
+    document.body.style.backgroundColor = "white";
+    startCountdown();
+};
+
+// リトライボタン
+retryButton.onclick = resetGame;
+
+function startCountdown() {
+    let countdown = 3;
+    countdownDisplay.style.display = 'block';
+    countdownDisplay.textContent = countdown;
+
+    countdownInterval = setInterval(() => {
+        countdown -= 1;
+        countdownDisplay.textContent = countdown;
+        if (countdown <= 0) {
+            clearInterval(countdownInterval);
+            countdownDisplay.style.display = 'none';
+            startGame();
+        }
+    }, 1000);
+}
+
+function startGame() {
+    score = 0;
+    timeLeft = 30.0;
+    scoreDisplay.textContent = `得点: ${score}`;
+    timerDisplay.textContent = `残り時間: ${timeLeft.toFixed(1)}秒`;
+    gameOverContainer.style.display = 'none';
+    retryButton.style.display = 'none';
+
+    startTimer();
+    spawnTargets();
+}
+
+let flashing = false; // 点滅中かどうかを記録
+
+function startTimer() {
+    timerInterval = setInterval(() => {
+        timeLeft -= 0.1;
+        timerDisplay.textContent = `残り時間: ${timeLeft.toFixed(1)}秒`;
+
+        // 残り10秒の瞬間に3回だけ点滅
+        if (timeLeft <= 10 && !flashing) {
+            flashTimer(3); 
+            flashing = true; // 一度だけ点滅
+        } 
+        
+        // 残り5秒から赤色
+        if (timeLeft <= 5) {
+            timerDisplay.style.color = 'red';
+        }
+
+        if (timeLeft <= 0) endGame();
+    }, 100);
+}
+
+function flashTimer(times) {
+    let flashes = 0;
+    const flashInterval = setInterval(() => {
+        timerDisplay.style.visibility = timerDisplay.style.visibility === 'hidden' ? 'visible' : 'hidden';
+        flashes++;
+        
+        if (flashes >= times * 2) {
+            clearInterval(flashInterval);
+            timerDisplay.style.visibility = 'visible';
+        }
+    }, 100); // 100ms間隔で点滅
+}
+
+
+
+function spawnTargets() {
+    document.querySelectorAll('.target').forEach(t => t.remove());
+    for (let i = 0; i < 3; i++) createTarget();
+}
+
+function createTarget() {
+    const container = document.body;
+    const targetData = [
+        { color: 'blue', points: 10, size: 40 },
+        { color: 'green', points: 5, size: 60 },
+        { color: 'orange', points: 20, size: 30 }
+    ][Math.floor(Math.random() * 3)];
+
+    const target = document.createElement('div');
+    target.classList.add('target');
+    target.style.backgroundColor = targetData.color;
+    target.style.width = `${targetData.size}px`;
+    target.style.height = `${targetData.size}px`;
+    target.style.top = `${Math.random() * (window.innerHeight - 70)}px`;
+    target.style.left = `${Math.random() * (window.innerWidth - 70)}px`;
+    target.onclick = () => handleTargetClick(targetData.points, target);
+
+    container.appendChild(target);
+
+    if (movingMode) startMovingTarget(target);
+}
+function startMovingTarget(target) {
+    let directionX = Math.random() < 0.5 ? 1 : -1; // 水平方向の移動方向
+    let directionY = Math.random() < 0.5 ? 1 : -1; // 垂直方向の移動方向
+    let speed = 2; // 移動速度
+
+    const moveInterval = setInterval(() => {
+        const targetRect = target.getBoundingClientRect();
+
+        // 画面の上下端でバウンド
+        if (targetRect.top <= 0 && directionY < 0) {
+            directionY *= -1; // 垂直方向の移動方向を反転
+        } else if (targetRect.bottom >= window.innerHeight && directionY > 0) {
+            directionY *= -1;
+        }
+        
+        // 画面の左右端でバウンド
+        if (targetRect.left <= 0 && directionX < 0) {
+            directionX *= -1; // 水平方向の移動方向を反転
+        } else if (targetRect.right >= window.innerWidth && directionX > 0) {
+            directionX *= -1;
+        }
+
+        // ターゲットを移動
+        target.style.top = `${target.offsetTop + directionY * speed}px`; 
+        target.style.left = `${target.offsetLeft + directionX * speed}px`;
+    }, 20); // 毎20ミリ秒に移動を更新
+
+    moveIntervals.push(moveInterval); // ターゲットの移動インターバルを保存
+}
+
+
+function handleTargetClick(points, target) {
+    score += points;
+    scoreDisplay.textContent = `得点: ${score}`;
+    target.remove();
+    spawnTargets();
+}
+
+function endGame() {
+    clearInterval(timerInterval);
+    clearInterval(moveInterval);
+    document.querySelectorAll('.target').forEach(target => target.remove());
+
+    gameOverContainer.style.display = 'block';
+    document.body.style.backgroundColor = "gray";
+
+    if (score > bestScore) bestScore = score;
+    bestScoreDisplay.textContent = `ベストスコア: ${bestScore}`;
+}
+
+function endGame() {
+    clearInterval(timerInterval);
+    clearInterval(moveInterval);
+    document.querySelectorAll('.target').forEach(target => target.remove());
+
+    gameOverContainer.style.display = 'block';
+    retryButton.style.display = 'block'; // 再チャレンジボタンを確実に表示
+    document.body.style.backgroundColor = "gray";
+
+    if (score > bestScore) bestScore = score;
+    bestScoreDisplay.textContent = `ベストスコア: ${bestScore}`;
+}
+
+function endGame() {
+    clearInterval(timerInterval);
+    clearInterval(moveInterval);
+    document.querySelectorAll('.target').forEach(target => target.remove());
+
+    gameOverContainer.style.display = 'block';
+    retryButton.style.display = 'block'; // 再チャレンジボタンを確実に表示
+    document.body.style.backgroundColor = "gray";
+
+    if (score > bestScore) bestScore = score;
+    bestScoreDisplay.textContent = `ベストスコア: ${bestScore}`;
+}
+
+function resetGame() {
+    if (!selectedMode) {
+        alert("ゲームモードを選択してください");
+        return;
+    }
+
+    // スコア、タイマー、表示リセット
+    score = 0;
+    scoreDisplay.textContent = `得点: ${score}`;
+    timeLeft = 30.0;
+    timerDisplay.textContent = `残り時間: ${timeLeft.toFixed(1)}秒`;
+    
+    // モード選択ボタンの色をリセット
+    movingModeButton.classList.toggle("selected", selectedMode === "moving");
+    noMoveModeButton.classList.toggle("selected", selectedMode === "noMove");
+    timerDisplay.style.color = 'black'
+
+    // UIの初期化とカウントダウン開始
+    modeSelection.style.display = "none";
+    document.body.style.backgroundColor = "white";
+    gameOverContainer.style.display = 'none';
+    
+    startCountdown();
+}
+
+// 再チャレンジボタンの表示とイベントリスナー
+retryButton.style.display = 'none'; // 初期非表示
+retryButton.onclick = resetGame; // 再チャレンジボタンが押されたときにリセット
+</script>
+        
+    
+</div></body>
